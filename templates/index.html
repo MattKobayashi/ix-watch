@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ ix_name }} Traffic Watch</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .chart-container {
+            position: relative;
+            height: 60vh;
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .table-container {
+            height: 56vh; /* Match chart container height, minus padding/headers */
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid my-5 px-4">
+        <div class="text-center mb-4">
+            <h1 class="display-5">{{ ix_name }} Traffic Watch</h1>
+        </div>
+
+        <!-- IP Broadcast Monitoring Section -->
+        <h2 class="h4 mb-3">IP Broadcast</h2>
+        <div class="row mb-5">
+            <div class="col-lg-8 mb-4 mb-lg-0">
+                <div class="chart-container">
+                    <canvas id="ipBroadcastChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header fw-bold">Top 10 IP Broadcast Sources</div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                             <table class="table table-sm table-striped mb-0">
+                                <thead><tr><th class="ps-3">MAC Address</th><th>Count</th></tr></thead>
+                                <tbody id="top-ip-broadcast-sources-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ARP Monitoring Section -->
+        <h2 class="h4 mb-3">Address Resolution Protocol (ARP)</h2>
+        <div class="row mb-5">
+            <div class="col-lg-8 mb-4 mb-lg-0">
+                <div class="chart-container">
+                    <canvas id="arpChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="row">
+                    <div class="col-lg-6 mb-4 mb-lg-0">
+                        <div class="card h-100">
+                            <div class="card-header fw-bold">Top 10 ARP Sources</div>
+                            <div class="card-body p-0">
+                                <div class="table-container">
+                                    <table class="table table-sm table-striped mb-0">
+                                        <thead><tr><th class="ps-3">MAC Address</th><th>Count</th></tr></thead>
+                                        <tbody id="top-arp-sources-table"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                             <div class="card-header fw-bold">Top 10 ARP Targets</div>
+                             <div class="card-body p-0">
+                                <div class="table-container">
+                                    <table class="table table-sm table-striped mb-0">
+                                        <thead><tr><th class="ps-3">IP Address</th><th>Count</th></tr></thead>
+                                        <tbody id="top-arp-destinations-table"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STP Monitoring Section -->
+        <h2 class="h4 mb-3">Spanning Tree Protocol (STP)</h2>
+        <div class="row mb-5">
+            <div class="col-lg-8 mb-4 mb-lg-0">
+                <div class="chart-container">
+                    <canvas id="stpChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header fw-bold">Top 10 STP Sources</div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                             <table class="table table-sm table-striped mb-0">
+                                <thead><tr><th class="ps-3">MAC Address</th><th>Count</th></tr></thead>
+                                <tbody id="top-stp-sources-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Non-IP Monitoring Section -->
+        <h2 class="h4 mb-3">Other Non-IP</h2>
+        <div class="row">
+            <div class="col-lg-8 mb-4 mb-lg-0">
+                <div class="chart-container">
+                    <canvas id="nonIpChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-header fw-bold">Top 10 Non-IP Sources</div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                             <table class="table table-sm table-striped mb-0">
+                                <thead><tr><th class="ps-3">MAC Address</th><th>Count</th></tr></thead>
+                                <tbody id="top-non-ip-sources-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <p class="text-muted" id="status-text">Fetching data...</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script>
+        const statusText = document.getElementById('status-text');
+
+        // ARP Elements
+        const arpCtx = document.getElementById('arpChart').getContext('2d');
+        const topArpSourcesBody = document.getElementById('top-arp-sources-table');
+        const topArpDestinationsBody = document.getElementById('top-arp-destinations-table');
+
+        // Non-IP Elements
+        const nonIpCtx = document.getElementById('nonIpChart').getContext('2d');
+        const topNonIpSourcesBody = document.getElementById('top-non-ip-sources-table');
+
+        // STP Elements
+        const stpCtx = document.getElementById('stpChart').getContext('2d');
+        const topStpSourcesBody = document.getElementById('top-stp-sources-table');
+
+        // IP Broadcast Elements
+        const ipBroadcastCtx = document.getElementById('ipBroadcastChart').getContext('2d');
+        const topIpBroadcastSourcesBody = document.getElementById('top-ip-broadcast-sources-table');
+
+        function createChart(ctx, label, color) {
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: label,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.25)'), // Add alpha for fill
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Count' } },
+                        x: { title: { display: true, text: 'Time' } }
+                    },
+                    animation: { duration: 250 }
+                }
+            });
+        }
+
+        const arpChart = createChart(arpCtx, 'ARP Requests', 'rgb(75, 192, 192)');
+        const nonIpChart = createChart(nonIpCtx, 'Non-IP Frames', 'rgb(153, 102, 255)');
+        const stpChart = createChart(stpCtx, 'STP Frames', 'rgb(255, 99, 132)');
+        const ipBroadcastChart = createChart(ipBroadcastCtx, 'IP Broadcasts', 'rgb(255, 159, 64)');
+
+        function populateTable(tbody, data) {
+            tbody.innerHTML = ''; // Clear existing rows
+            if (data && data.length > 0) {
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td class="ps-3"><code>${item[0]}</code></td><td>${item[1]}</td>`;
+                    tbody.appendChild(row);
+                });
+            } else {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="2" class="text-muted text-center ps-3">No data in time window</td>`;
+                tbody.appendChild(row);
+            }
+        }
+
+        async function updateChart() {
+            try {
+                const response = await fetch('/api/data');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                const arpData = data.arp_data;
+                const stpData = data.stp_data;
+                const nonIpData = data.non_ip_data;
+                const ipBroadcastData = data.ip_broadcast_data;
+
+                // Update IP Broadcast chart & tables
+                ipBroadcastChart.data.labels = ipBroadcastData.labels;
+                ipBroadcastChart.data.datasets[0].data = ipBroadcastData.values;
+                ipBroadcastChart.update();
+                populateTable(topIpBroadcastSourcesBody, ipBroadcastData.top_sources);
+
+                // Update ARP chart & tables
+                arpChart.data.labels = arpData.labels;
+                arpChart.data.datasets[0].data = arpData.values;
+                arpChart.update();
+                populateTable(topArpSourcesBody, arpData.top_sources);
+                populateTable(topArpDestinationsBody, arpData.top_destinations);
+
+                // Update Non-IP chart & tables
+                nonIpChart.data.labels = nonIpData.labels;
+                nonIpChart.data.datasets[0].data = nonIpData.values;
+                nonIpChart.update();
+                populateTable(topNonIpSourcesBody, nonIpData.top_sources);
+
+                // Update STP chart & tables
+                stpChart.data.labels = stpData.labels;
+                stpChart.data.datasets[0].data = stpData.values;
+                stpChart.update();
+                populateTable(topStpSourcesBody, stpData.top_sources);
+
+                const ipBroadcastTotal = ipBroadcastData.values.reduce((a, b) => a + b, 0);
+                const arpTotal = arpData.values.reduce((a, b) => a + b, 0);
+                const stpTotal = stpData.values.reduce((a, b) => a + b, 0);
+                const nonIpTotal = nonIpData.values.reduce((a, b) => a + b, 0);
+
+                statusText.textContent = `Monitoring ${data.interfaces.join(', ')}. ` +
+                    `IP Broadcast (Win: ${ipBroadcastData.window_seconds}s, Pkts: ${ipBroadcastTotal}, Thresh: ${ipBroadcastData.threshold}). ` +
+                    `ARP (Win: ${arpData.window_seconds}s, Pkts: ${arpTotal}, Thresh: ${arpData.threshold}). ` +
+                    `STP (Win: ${stpData.window_seconds}s, Pkts: ${stpTotal}, Thresh: ${stpData.threshold}). ` +
+                    `Non-IP (Win: ${nonIpData.window_seconds}s, Pkts: ${nonIpTotal}, Thresh: ${nonIpData.threshold}).`;
+
+            } catch (error) {
+                console.error("Failed to fetch chart data:", error);
+                statusText.textContent = "Error fetching data. Is the server running?";
+            }
+        }
+
+        // Update every 30 seconds
+        setInterval(updateChart, 30000);
+        // Initial load
+        document.addEventListener('DOMContentLoaded', updateChart);
+    </script>
+</body>
+</html>
