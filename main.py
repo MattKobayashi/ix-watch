@@ -11,6 +11,7 @@ import time
 import threading
 import asyncio
 import logging
+import json
 import socket
 from contextlib import asynccontextmanager
 from collections import deque, Counter
@@ -19,7 +20,7 @@ from datetime import datetime
 import apprise
 from apprise import NotifyType
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from scapy.all import sniff, ARP, STP, IP, Ether
@@ -37,8 +38,13 @@ IP_BROADCAST_ALERT_THRESHOLD = int(os.getenv("IP_BROADCAST_ALERT_THRESHOLD", 100
 TIME_WINDOW_SECONDS = int(os.getenv("TIME_WINDOW_SECONDS", 900))
 STP_ALERT_THRESHOLD = int(os.getenv("STP_ALERT_THRESHOLD", 1))
 NON_IP_ALERT_THRESHOLD = int(os.getenv("NON_IP_ALERT_THRESHOLD", 1))
-APPRISE_URLS = [url.strip() for url in os.getenv("APPRISE_URLS", None).split(",")]
+# Gracefully handle an unset or empty APPRISE_URLS environment variable
+APPRISE_URLS = [url.strip() for url in os.getenv("APPRISE_URLS", "").split(",") if url.strip()]
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", 3600))
+
+# --- WebSocket Broadcast ---
+live_ws_clients: set[WebSocket] = set()
+BROADCAST_INTERVAL = 30  # seconds
 
 # --- Global State ---
 # Stores tuples of (timestamp, src_mac, target_ip) for ARP
@@ -318,12 +324,15 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(monitor_non_ip_packets()),
         asyncio.create_task(monitor_ip_broadcast_packets()),
     ]
+    broadcaster_task = asyncio.create_task(websocket_broadcaster())
     try:
         yield
     finally:
         for task in monitor_tasks:
             task.cancel()
         await asyncio.gather(*monitor_tasks, return_exceptions=True)
+        broadcaster_task.cancel()
+        await asyncio.gather(broadcaster_task, return_exceptions=True)
         if sniffer_thread:
             sniffer_thread.join(timeout=1)
 
@@ -331,6 +340,41 @@ async def lifespan(app: FastAPI):
 # --- FastAPI Application ---
 app = FastAPI(title="ARP Monitor", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
+
+
+# --- WebSocket Endpoint & Broadcaster ---
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await ws.accept()
+    live_ws_clients.add(ws)
+    try:
+        while True:
+            # Keep the connection alive; we don’t expect messages from the client
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        live_ws_clients.discard(ws)
+
+async def websocket_broadcaster():
+    """Push fresh data to all connected clients every BROADCAST_INTERVAL seconds."""
+    while True:
+        await asyncio.sleep(BROADCAST_INTERVAL)
+        if not live_ws_clients:
+            continue
+        try:
+            data_response = await get_api_data()
+            payload = data_response.body.decode()
+        except Exception as exc:
+            logging.error(f"Failed to build WebSocket payload: {exc}")
+            continue
+
+        dead_clients = []
+        for ws in live_ws_clients:
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                dead_clients.append(ws)
+        for ws in dead_clients:
+            live_ws_clients.discard(ws)
 
 
 @app.get("/", response_class=HTMLResponse)
