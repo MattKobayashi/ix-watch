@@ -163,6 +163,14 @@
         const ipBroadcastCtx = document.getElementById('ipBroadcastChart').getContext('2d');
         const topIpBroadcastSourcesBody = document.getElementById('top-ip-broadcast-sources-table');
 
+        // Helper to add alpha channel to rgb() colours
+        function rgba(color, alpha = 0.25) {
+            if (color.startsWith('rgb(')) {
+                return color.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+            }
+            return color;
+        }
+
         function createChart(ctx, label, color) {
             return new Chart(ctx, {
                 type: 'line',
@@ -172,7 +180,7 @@
                         label: label,
                         data: [],
                         borderColor: color,
-                        backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.25)'), // Add alpha for fill
+                        backgroundColor: rgba(color, 0.25), // Add alpha for fill
                         borderWidth: 2,
                         fill: true,
                         tension: 0.3
@@ -264,8 +272,12 @@
             }
         }
 
-        // Update every 30 seconds
-        setInterval(updateChart, 30000);
+        // Update every 30 seconds, but only when the tab is visible
+        setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                updateChart();
+            }
+        }, 30000);
         // Initial load
         document.addEventListener('DOMContentLoaded', updateChart);
     </script>

@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from scapy.all import sniff, ARP, STP, IP
+from scapy.all import sniff, ARP, STP, IP, Ether
 
 # --- Configuration ---
 logging.basicConfig(
@@ -42,22 +42,22 @@ ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", 3600))
 
 # --- Global State ---
 # Stores tuples of (timestamp, src_mac, target_ip) for ARP
-packet_log = deque()
+packet_log = deque(maxlen=1_000_000)  # Bound memory usage to prevent unbounded growth
 packet_lock = threading.Lock()
 arp_last_alert_time = 0
 
 # Stores tuples of (timestamp, src_mac) for STP
-stp_packet_log = deque()
+stp_packet_log = deque(maxlen=1_000_000)  # Bound memory usage
 stp_packet_lock = threading.Lock()
 stp_last_alert_time = 0
 
 # Stores tuples of (timestamp, src_mac) for other non-IP frames
-non_ip_packet_log = deque()
+non_ip_packet_log = deque(maxlen=1_000_000)  # Bound memory usage
 non_ip_packet_lock = threading.Lock()
 non_ip_last_alert_time = 0
 
 # Stores tuples of (timestamp, src_mac) for IP broadcasts
-ip_broadcast_packet_log = deque()
+ip_broadcast_packet_log = deque(maxlen=1_000_000)  # Bound memory usage
 ip_broadcast_packet_lock = threading.Lock()
 ip_broadcast_last_alert_time = 0
 
@@ -144,7 +144,7 @@ def packet_callback(packet):
             stp_packet_log.append((time.time(), packet.src))
     elif (
         packet.haslayer(IP)
-        and packet.dst == "ff:ff:ff:ff:ff:ff"
+        and packet[Ether].dst == "ff:ff:ff:ff:ff:ff"  # Use Ether layer for accurate dst MAC
         and not packet.haslayer(ARP)
     ):
         with ip_broadcast_packet_lock:
@@ -195,8 +195,12 @@ async def monitor_arp_packets():
         if current_count > ARP_ALERT_THRESHOLD:
             if now - arp_last_alert_time > ALERT_COOLDOWN_SECONDS:
                 logging.warning(f"ARP threshold exceeded: {current_count} packets.")
-                send_slack_alert(
-                    current_count, "ARP", TIME_WINDOW_SECONDS, ARP_ALERT_THRESHOLD
+                await asyncio.to_thread(
+                    send_slack_alert,
+                    current_count,
+                    "ARP",
+                    TIME_WINDOW_SECONDS,
+                    ARP_ALERT_THRESHOLD,
                 )
                 arp_last_alert_time = now
             else:
@@ -221,8 +225,12 @@ async def monitor_stp_packets():
         if current_count > STP_ALERT_THRESHOLD:
             if now - stp_last_alert_time > ALERT_COOLDOWN_SECONDS:
                 logging.warning(f"STP threshold exceeded: {current_count} packets.")
-                send_slack_alert(
-                    current_count, "STP", TIME_WINDOW_SECONDS, STP_ALERT_THRESHOLD
+                await asyncio.to_thread(
+                    send_slack_alert,
+                    current_count,
+                    "STP",
+                    TIME_WINDOW_SECONDS,
+                    STP_ALERT_THRESHOLD,
                 )
                 stp_last_alert_time = now
             else:
@@ -250,7 +258,8 @@ async def monitor_non_ip_packets():
         if current_count > NON_IP_ALERT_THRESHOLD:
             if now - non_ip_last_alert_time > ALERT_COOLDOWN_SECONDS:
                 logging.warning(f"Non-IP threshold exceeded: {current_count} packets.")
-                send_slack_alert(
+                await asyncio.to_thread(
+                    send_slack_alert,
                     current_count,
                     "NON_IP",
                     TIME_WINDOW_SECONDS,
@@ -284,7 +293,8 @@ async def monitor_ip_broadcast_packets():
                 logging.warning(
                     f"IP Broadcast threshold exceeded: {current_count} packets."
                 )
-                send_slack_alert(
+                await asyncio.to_thread(
+                    send_slack_alert,
                     current_count,
                     "IP_BROADCAST",
                     TIME_WINDOW_SECONDS,
@@ -308,7 +318,14 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(monitor_non_ip_packets()),
         asyncio.create_task(monitor_ip_broadcast_packets()),
     ]
-    yield
+    try:
+        yield
+    finally:
+        for task in monitor_tasks:
+            task.cancel()
+        await asyncio.gather(*monitor_tasks, return_exceptions=True)
+        if sniffer_thread:
+            sniffer_thread.join(timeout=1)
 
 
 # --- FastAPI Application ---
