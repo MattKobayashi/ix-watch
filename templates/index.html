@@ -163,6 +163,14 @@
         const ipBroadcastCtx = document.getElementById('ipBroadcastChart').getContext('2d');
         const topIpBroadcastSourcesBody = document.getElementById('top-ip-broadcast-sources-table');
 
+        // Helper to add alpha channel to rgb() colours
+        function rgba(color, alpha = 0.25) {
+            if (color.startsWith('rgb(')) {
+                return color.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+            }
+            return color;
+        }
+
         function createChart(ctx, label, color) {
             return new Chart(ctx, {
                 type: 'line',
@@ -172,7 +180,7 @@
                         label: label,
                         data: [],
                         borderColor: color,
-                        backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.25)'), // Add alpha for fill
+                        backgroundColor: rgba(color, 0.25), // Add alpha for fill
                         borderWidth: 2,
                         fill: true,
                         tension: 0.3
@@ -208,6 +216,49 @@
                 row.innerHTML = `<td colspan="2" class="text-muted text-center ps-3">No data in time window</td>`;
                 tbody.appendChild(row);
             }
+        }
+
+        function renderAll(data) {
+            const arpData = data.arp_data;
+            const stpData = data.stp_data;
+            const nonIpData = data.non_ip_data;
+            const ipBroadcastData = data.ip_broadcast_data;
+
+            // Update IP Broadcast chart & tables
+            ipBroadcastChart.data.labels = ipBroadcastData.labels;
+            ipBroadcastChart.data.datasets[0].data = ipBroadcastData.values;
+            ipBroadcastChart.update();
+            populateTable(topIpBroadcastSourcesBody, ipBroadcastData.top_sources);
+
+            // Update ARP chart & tables
+            arpChart.data.labels = arpData.labels;
+            arpChart.data.datasets[0].data = arpData.values;
+            arpChart.update();
+            populateTable(topArpSourcesBody, arpData.top_sources);
+            populateTable(topArpDestinationsBody, arpData.top_destinations);
+
+            // Update Non-IP chart & tables
+            nonIpChart.data.labels = nonIpData.labels;
+            nonIpChart.data.datasets[0].data = nonIpData.values;
+            nonIpChart.update();
+            populateTable(topNonIpSourcesBody, nonIpData.top_sources);
+
+            // Update STP chart & tables
+            stpChart.data.labels = stpData.labels;
+            stpChart.data.datasets[0].data = stpData.values;
+            stpChart.update();
+            populateTable(topStpSourcesBody, stpData.top_sources);
+
+            const ipBroadcastTotal = ipBroadcastData.values.reduce((a, b) => a + b, 0);
+            const arpTotal = arpData.values.reduce((a, b) => a + b, 0);
+            const stpTotal = stpData.values.reduce((a, b) => a + b, 0);
+            const nonIpTotal = nonIpData.values.reduce((a, b) => a + b, 0);
+
+            statusText.textContent = `Monitoring ${data.interfaces.join(', ')}. ` +
+                `IP Broadcast (Win: ${ipBroadcastData.window_seconds}s, Pkts: ${ipBroadcastTotal}, Thresh: ${ipBroadcastData.threshold}). ` +
+                `ARP (Win: ${arpData.window_seconds}s, Pkts: ${arpTotal}, Thresh: ${arpData.threshold}). ` +
+                `STP (Win: ${stpData.window_seconds}s, Pkts: ${stpTotal}, Thresh: ${stpData.threshold}). ` +
+                `Non-IP (Win: ${nonIpData.window_seconds}s, Pkts: ${nonIpTotal}, Thresh: ${nonIpData.threshold}).`;
         }
 
         async function updateChart() {
@@ -264,10 +315,36 @@
             }
         }
 
-        // Update every 30 seconds
-        setInterval(updateChart, 30000);
-        // Initial load
-        document.addEventListener('DOMContentLoaded', updateChart);
+        // --- WebSocket support with HTTP-polling fallback ---
+        const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        let ws;
+
+        function startWebSocket() {
+            ws = new WebSocket(`${wsScheme}://${location.host}/ws`);
+            ws.onmessage = (ev) => {
+                const data = JSON.parse(ev.data);
+                renderAll(data);
+            };
+            ws.onopen = () => console.log('WebSocket connected');
+            ws.onerror = (e) => console.error('WebSocket error', e);
+            ws.onclose = () => {
+                console.warn('WebSocket closed – falling back to HTTP polling');
+                startPollingFallback();
+            };
+        }
+
+        function startPollingFallback() {
+            updateChart(); // initial fetch
+            setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    updateChart();
+                }
+            }, 30000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            startWebSocket();
+        });
     </script>
 </body>
 </html>
