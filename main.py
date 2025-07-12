@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.12,<3.13"
 # dependencies = [
-#     "fastapi[standard]==0.115.14",
+#     "fastapi[standard]==0.116.1",
 #     "apprise==1.9.3",
 #     "scapy==2.6.1",
 # ]
