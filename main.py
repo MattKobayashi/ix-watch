@@ -1,18 +1,10 @@
-# /// script
-# requires-python = ">=3.12,<3.13"
-# dependencies = [
-#     "fastapi[standard]==0.116.1",
-#     "apprise==1.9.3",
-#     "scapy==2.6.1",
-# ]
-# ///
+#! /usr/bin/env python3
 import os
 import time
 import threading
 import asyncio
 import logging
-import json
-import socket
+
 from contextlib import asynccontextmanager
 from collections import deque, Counter
 from datetime import datetime
@@ -125,20 +117,6 @@ def send_slack_alert(count: int, alert_type: str, window: int, threshold: int):
         logging.error(f"Failed to send Apprise alert for {alert_type}: {e}")
 
 
-# --- Scapy Sniffer ---
-def has_net_raw_capability():
-    """Checks for CAP_NET_RAW capability, required for sniffing."""
-    if hasattr(socket, "AF_PACKET"):
-        try:
-            s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
-            s.close()
-            return True
-        except PermissionError:
-            return False
-    # Fallback for non-Linux systems.
-    return os.geteuid() == 0
-
-
 def packet_callback(packet):
     """Callback function for scapy's sniff(). Appends packet info to relevant deques."""
     if packet.haslayer(ARP) and packet[ARP].op == 1:  # ARP "who-has"
@@ -163,12 +141,6 @@ def packet_callback(packet):
 def start_sniffer():
     """Starts the Scapy packet sniffer in a separate thread."""
     global sniffer_thread
-    if not has_net_raw_capability():
-        logging.error(
-            "Scapy requires CAP_NET_RAW capability. "
-            "Please run with sudo or grant the capability."
-        )
-        return
 
     # The filter below captures non-IP/IPv6 frames (like ARP, STP) AND IPv4 broadcast packets.
     logging.info(f"Starting packet sniffer on interfaces: {INTERFACES}")
