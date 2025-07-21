@@ -11,7 +11,6 @@ import time
 import threading
 import asyncio
 import logging
-import socket
 
 try:
     import _capng as capng
