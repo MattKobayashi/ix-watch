@@ -31,7 +31,7 @@ jobs:
       - name: Start and test container image
         run: |
           set -eux
-          docker compose up --build --detach --timeout 60
+          docker compose run --build --interactive=false --name=ix-watch ix-watch &
           sleep 60
           docker container inspect --format='{{.State.Health.Status}}' ix-watch | grep -w 'healthy'
         working-directory: tests
