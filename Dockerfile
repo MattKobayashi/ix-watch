@@ -42,7 +42,8 @@ COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Run the application
-CMD ["python", "/app/main.py"]
+WORKDIR /app
+CMD ["python", "main.py"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -fsSL http://127.0.0.1:8000/health | grep 'ok'
