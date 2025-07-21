@@ -1,11 +1,4 @@
-# /// script
-# requires-python = ">=3.13, <3.14"
-# dependencies = [
-#     "fastapi[standard]==0.116.1",
-#     "apprise==1.9.3",
-#     "scapy==2.6.1",
-# ]
-# ///
+#! /usr/bin/env python3
 import os
 import time
 import threading
