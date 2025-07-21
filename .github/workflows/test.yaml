@@ -35,13 +35,6 @@ jobs:
           sleep 60
           docker container inspect --format='{{.State.Health.Status}}' ix-watch | grep -w 'healthy'
         working-directory: tests
-      # Stop and remove the test container image
-      - name: Stop and remove container image
-        if: ${{ !cancelled() }}
-        run: |
-          set -eux
-          docker compose down --timeout 60
-        working-directory: tests
 name: Test
 on:
   pull_request:
