@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.12,<3.13"
+# requires-python = ">=3.13, <3.14"
 # dependencies = [
 #     "fastapi[standard]==0.116.1",
 #     "apprise==1.9.3",
