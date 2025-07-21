@@ -33,7 +33,7 @@ jobs:
           set -eux
           docker compose up --build --detach --timeout 60
           sleep 60
-          docker inspect --format='{{.State.Health.Status}}' ix-watch | grep -w 'healthy'
+          docker container inspect --format='{{.State.Health.Status}}' ix-watch | grep -w 'healthy'
         working-directory: tests
       # Stop and remove the test container image
       - name: Stop and remove container image
