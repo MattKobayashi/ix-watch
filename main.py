@@ -12,6 +12,11 @@ import threading
 import asyncio
 import logging
 import socket
+
+try:
+    import _capng as capng
+except ModuleNotFoundError:   # cap-ng not installed
+    capng = None
 from contextlib import asynccontextmanager
 from collections import deque, Counter
 from datetime import datetime
@@ -125,17 +130,47 @@ def send_slack_alert(count: int, alert_type: str, window: int, threshold: int):
 
 
 # --- Scapy Sniffer ---
-def has_net_raw_capability():
-    """Checks for CAP_NET_RAW capability, required for sniffing."""
-    if hasattr(socket, "AF_PACKET"):
-        try:
-            s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
-            s.close()
-            return True
-        except PermissionError:
-            return False
-    # Fallback for non-Linux systems.
-    return os.geteuid() == 0
+def has_net_raw_capability() -> bool:
+    """
+    Ensure the process owns (and, if possible, acquires) both
+    CAP_NET_RAW and CAP_NET_ADMIN.  Returns True when the two
+    capabilities are present in the *effective* set.
+    """
+    # libcap-ng not available – fall back to the old behaviour
+    if capng is None:
+        logging.warning("libcap-ng python bindings missing; "
+                        "capability management disabled.")
+        return os.geteuid() == 0  # root only fallback
+
+    # Load current cap sets of the running process
+    capng.capng_get_caps_process()
+
+    need_raw   = capng.capng_have_capability(capng.CAPNG_EFFECTIVE,
+                                             capng.CAP_NET_RAW)   == 0
+    need_admin = capng.capng_have_capability(capng.CAPNG_EFFECTIVE,
+                                             capng.CAP_NET_ADMIN) == 0
+    if not (need_raw or need_admin):
+        return True   # we already own both caps
+
+    # Try to add missing caps from the permitted set
+    if need_raw:
+        capng.capng_update(capng.CAPNG_ADD,
+                           capng.CAPNG_PERMITTED | capng.CAPNG_EFFECTIVE,
+                           capng.CAP_NET_RAW)
+    if need_admin:
+        capng.capng_update(capng.CAPNG_ADD,
+                           capng.CAPNG_PERMITTED | capng.CAPNG_EFFECTIVE,
+                           capng.CAP_NET_ADMIN)
+
+    # Apply the changes
+    if capng.capng_apply(capng.CAPNG_SELECT_CAPS) < 0:
+        logging.error("Failed to apply CAP_NET_RAW/CAP_NET_ADMIN")
+        return False
+
+    # Re-validate
+    capng.capng_get_caps_process()
+    return (capng.capng_have_capability(capng.CAPNG_EFFECTIVE, capng.CAP_NET_RAW)   == 1 and
+            capng.capng_have_capability(capng.CAPNG_EFFECTIVE, capng.CAP_NET_ADMIN) == 1)
 
 
 def packet_callback(packet):
