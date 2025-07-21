@@ -7,6 +7,7 @@ services:
       dockerfile: Dockerfile
     cap_add:
       - NET_ADMIN
+      - SYS_ADMIN
     container_name: ix-watch
     environment:
       - "ALERT_COOLDOWN_SECONDS=3600"
