@@ -11,7 +11,6 @@ import time
 import threading
 import asyncio
 import logging
-import json
 import socket
 from contextlib import asynccontextmanager
 from collections import deque, Counter
