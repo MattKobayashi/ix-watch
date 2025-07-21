@@ -15,8 +15,7 @@ RUN apk --no-cache add \
     libpcap="${LIBPCAP_VERSION}" \
     uv="${UV_VERSION}"
 
-RUN adduser --disabled-password ix-watch \
-    && setcap cap_net_raw,cap_net_admin+eip /usr/bin/python3.12
+RUN adduser --disabled-password ix-watch
 USER ix-watch
 WORKDIR /opt/ix-watch
 COPY main.py /opt/ix-watch/
