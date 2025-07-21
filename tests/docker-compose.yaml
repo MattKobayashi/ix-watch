@@ -5,13 +5,10 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
     container_name: ix-watch
     environment:
       - "ALERT_COOLDOWN_SECONDS=3600"
-      - "APPRISE_URLS=pover://ui6pub32a17rp8pueby7mg4i4htv4i@a2n74fbkdunyw69n4gv1ndp3uba1ss"
+      - "APPRISE_URLS=pover://<user>@<app>"
       - "ARP_ALERT_THRESHOLD=100000"
       - "INTERFACES=eth0"
       - "IP_BROADCAST_ALERT_THRESHOLD=100"
