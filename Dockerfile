@@ -2,7 +2,7 @@
 
 # First, build the application in the `/app` directory.
 # See `Dockerfile` for details.
-FROM ghcr.io/astral-sh/uv:0.8.6-python3.13-bookworm-slim@sha256:b2734f8916b68b451f01747e4c728cedf1bbfeffdbc0398f7c8b18649a715377 AS builder
+FROM ghcr.io/astral-sh/uv:0.8.8-python3.13-bookworm-slim@sha256:3f3d25fe8a061c37a8be55f78ea60a042cad19021ce75bd4adac0796a08ab339 AS builder
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 # Disable Python downloads, because we want to use the system interpreter
