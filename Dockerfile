@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 # Then, use a final image without uv
-FROM python:3.13-slim-bookworm@sha256:d2cdf9295b3705ba3c117f218f5c7fc0f2152aa9edc14528e65f33ca2fbaff3b
+FROM python:3.13-slim-bookworm@sha256:eda80914effc588e0494430f27721224d9c6b54d209edffa816a58194358ced3
 # It is important to use the image that matches the builder, as the path to the
 # Python executable must be the same, e.g., using `python:3.11-slim-bookworm`
 # will fail.
