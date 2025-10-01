@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13, <3.14"
 dependencies = [
-    "apprise==1.9.4",
+    "apprise==1.9.5",
     "fastapi[standard]==0.118.0",
     "scapy==2.6.1",
 ]
