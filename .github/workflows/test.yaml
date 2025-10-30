@@ -42,6 +42,7 @@ on:
       - main
     paths:
       - "**.py"
+      - "**.toml"
       - "**.yaml"
       - "Dockerfile"
   workflow_dispatch:
