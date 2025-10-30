@@ -1,8 +1,4 @@
-# An example using multi-stage image builds to create a final image without uv.
-
-# First, build the application in the `/app` directory.
-# See `Dockerfile` for details.
-FROM ghcr.io/astral-sh/uv:0.9.5-python3.13-bookworm-slim@sha256:60d8ee2c1f7ffce050822adcb44907514e39f29d2d7b37732e8fca9f4f6113af AS builder
+FROM python:3.13.9-slim-trixie@sha256:0222b795db95bf7412cede36ab46a266cfb31f632e64051aac9806dabf840a61 AS builder
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 # Disable Python downloads, because we want to use the system interpreter
@@ -10,6 +6,14 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 # copied from the build image into the final image; see `standalone.Dockerfile`
 # for an example.
 ENV UV_PYTHON_DOWNLOADS=0
+
+# Install build dependencies
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes \
+    build-essential
+
+# Copy the uv binaries from the distroless image
+COPY --from=ghcr.io/astral-sh/uv:0.9.6@sha256:4b96ee9429583983fd172c33a02ecac5242d63fb46bc27804748e38c1cc9ad0d /uv /uvx /bin/
 
 WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -22,7 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 # Then, use a final image without uv
-FROM python:3.14-slim-bookworm@sha256:8a8d3341dfc71b7420256ceff425f64247da7e23fbe3fc23c3ea8cfbad59096d
+FROM python:3.13.9-slim-trixie@sha256:0222b795db95bf7412cede36ab46a266cfb31f632e64051aac9806dabf840a61
 # It is important to use the image that matches the builder, as the path to the
 # Python executable must be the same, e.g., using `python:3.11-slim-bookworm`
 # will fail.
