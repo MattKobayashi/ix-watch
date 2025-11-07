@@ -6,6 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13, <3.14"
 dependencies = [
     "apprise==1.9.5",
-    "fastapi[standard]==0.119.1",
+    "fastapi[standard]==0.121.0",
     "scapy==2.6.1",
 ]
