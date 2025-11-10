@@ -3,7 +3,7 @@ name = "ix-watch"
 version = "0.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13, <3.14"
+requires-python = ">=3.14, <3.15"
 dependencies = [
     "apprise==1.9.5",
     "fastapi[standard]==0.121.1",
