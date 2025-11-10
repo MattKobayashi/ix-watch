@@ -36,7 +36,7 @@ RUN apt-get update \
     curl \
     libcap2-bin \
     libpcap-dev \
-    && setcap cap_net_raw+ep /usr/local/bin/python3.13 \
+    && setcap cap_net_raw+ep $(readlink -ne $(which python3)) \
     && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
 
 # Copy the application from the builder
