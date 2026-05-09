@@ -1,4 +1,4 @@
-FROM python:3.14.4-slim-trixie@sha256:c11aee3b3cae066f55d1e9318fc812673aa6557073b0db0d792b59491b262e0c AS builder
+FROM python:3.14.4-slim-trixie@sha256:ec2f6b1d6fa9650fa03a23a28e51956732ead7e16035598f27d40e959d701f4f AS builder
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 # Disable Python downloads, because we want to use the system interpreter
@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 # Then, use a final image without uv
-FROM python:3.14.4-slim-trixie@sha256:c11aee3b3cae066f55d1e9318fc812673aa6557073b0db0d792b59491b262e0c
+FROM python:3.14.4-slim-trixie@sha256:ec2f6b1d6fa9650fa03a23a28e51956732ead7e16035598f27d40e959d701f4f
 # It is important to use the image that matches the builder, as the path to the
 # Python executable must be the same, e.g., using `python:3.11-slim-bookworm`
 # will fail.
