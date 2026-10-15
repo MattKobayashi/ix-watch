@@ -7,6 +7,11 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 # for an example.
 ENV UV_PYTHON_DOWNLOADS=0
 
+# Build native Python dependencies when prebuilt wheels are unavailable.
+RUN apt-get update \
+    && apt-get --no-install-recommends --yes install build-essential \
+    && rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
 # Copy the uv binaries from the distroless image
 COPY --from=ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 /uv /uvx /bin/
 
